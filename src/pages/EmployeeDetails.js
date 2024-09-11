@@ -1,87 +1,78 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
+import React, { useState,useEffect } from 'react';
+import { useLocation,useParams ,useNavigate} from 'react-router-dom';
 import { Card, Icon, Table, Button, Modal, Form, Dropdown } from 'semantic-ui-react';
 import { Doughnut } from 'react-chartjs-2';
 import 'chart.js/auto';
 import './EmployeeDetails.css';
 
 const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
+  const { id } = useParams(); 
+  const [error, setError] = useState(null);
   const location = useLocation();
   const navigate = useNavigate(); // Initialize useNavigate for navigation
   const { employee, allocationPercentage: initialAllocation } = location.state; // Get the employee and initial allocation percentage from state
-
+  
   // Client data and project data from Projects.js
-  const clientData = [
-    {
-      company: 'Acme Corp',
-      projects: ['Website Redesign', 'Mobile App Development'],
-      id: 'acme-corp',
-    },
-    {
-      company: 'Global Tech',
-      projects: ['AI Research', 'Data Migration'],
-      id: 'global-tech',
-    },
-    {
-      company: 'Healthify Inc.',
-      projects: ['Health Tracking App', 'Wellness Portal'],
-      id: 'healthify-inc',
-    },
-    {
-      company: 'EduPro',
-      projects: ['E-learning Platform', 'Course Management System'],
-      id: 'edupro',
-    },
-    {
-      company: 'Innover',
-      projects: ['Benched'],
-      id: 'innover',
-    },
-  ];
-
-  // Options for client dropdown
-  const clientOptions = clientData.map((client) => ({
-    key: client.id,
-    text: client.company,
-    value: client.company, // Using company name as value to match table entries
-  }));
-
-  // State to manage the allocation data
-  const [allocations, setAllocations] = useState([
-    {
-      employeeName: employee.employee_name,
-      employeeId: employee.employee_id,
-      clientName: 'Acme Corp',
-      projectName: 'Website Redesign',
-      allocation: initialAllocation, // Initialize with passed allocation percentage
-      status: 'Active',
-      startDate: '2020-05-02',
-      endDate: '2024-05-02',
-      billingRate: 100, // Example billing rate
-      timeSheetApprover: 'John Doe', // Example timesheet approver
-    },
-  ]);
-
-  // State to manage modal visibility
+  const [clientData, setClientData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [allocations, setAllocations] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
   const [open, setOpen] = useState(false);
-
-  // State to manage new allocation input
   const [newAllocation, setNewAllocation] = useState({
-    employeeName: employee.employee_name, // Pre-fill with current employee name
-    employeeId: employee.employee_id, // Pre-fill with current employee ID
+    employeeName: employee.EmployeeName,
+    employeeId: employee.EmployeeID,
     clientName: '',
     projectName: '',
     status: '',
     allocation: '',
     startDate: '',
     endDate: '',
-    billingRate: '', // New field for Billing Rate
-    timeSheetApprover: '', // New field for Time Sheet Approver
-  });
+    billingRate: '',
+    timeSheetApprover: '',
+  });// Loading state
+
+  // Fetch data from APIs
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        setLoading(true);
+        const Response = await fetch('http://localhost:5000/clients');
+        
+        
+        if (!Response.ok || !Response.ok) {
+          throw new Error('Network response was not ok');
+        }
+
+        const Data = await Response.json();
+        
+
+        setClientData(Data);
+        
+      } catch (error) {
+        console.error('Fetch error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClientData();
+  }, []);
+  // Options for client dropdown
+  const clientOptions = clientData.map((client) => ({
+    key: client.ClientID,
+    text: client.ClientName,
+    value: client.ClientName, // Using company name as value to match table entries
+  }));
+
+  // State to manage the allocation data
+ 
+  
+  // State to manage modal visibility
+  
 
   // State to manage selected client and project
   const [selectedClient, setSelectedClient] = useState('');
-  const [projectOptions, setProjectOptions] = useState([]);
+  
 
   // State to manage the currently edited allocation
   const [editIndex, setEditIndex] = useState(null);
@@ -92,24 +83,120 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
     { key: 'unallocated', text: 'Project Unallocated', value: 'Project Unallocated' },
     { key: 'x', text: 'X', value: 'X' },
   ];
+  useEffect(() => {
+    const fetchEmployeeData = async () => {
+      try {
+        // setLoading(true);
+   
+        const Response = await fetch(`http://localhost:5000/detailed-view/${id}`);
+
+        
+        if (!Response.ok ) {
+          throw new Error('Network response was not ok');
+        }
+
+        const Data = await Response.json();
+        
+
+        setAllocations(Data);
+        
+      } catch (error) {
+        console.error('Fetch error:', error);
+      } finally {
+        // setLoading(false);
+      }
+    };
+
+    fetchEmployeeData();
+  }, []);
+  useEffect(() => {
+    const fetchEmployeeData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/detailed-view/${id}`);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setAllocations(data);
+      } catch (error) {
+        console.error('Fetch error:', error);
+        setError('Failed to load employee data');
+      }
+    };
+
+    fetchEmployeeData();
+  }, [id]);
+  useEffect(() => {
+    const fetchProjects = async (clientName) => {
+      try {
+        if (clientName) {
+          const formattedProjectName = clientName.replace(/-/g, ' ');
+        const encodedProjectName = encodeURIComponent(formattedProjectName);
+          const response = await fetch(`http://localhost:5000/client/${clientName}/allprojects`);
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          const projects = await response.json();
+          const projectOptions = projects.map(project => ({
+            key: project.ProjectName,
+            text: project.ProjectName,
+            value: project.ProjectName,
+          }));
+          setProjectOptions([{ key: 'none', text: 'None', value: '' }, ...projectOptions]);
+        } else {
+          setProjectOptions([{ key: 'none', text: 'None', value: '' }]);
+        }
+      } catch (error) {
+        setError('Failed to load projects');
+        console.error('Fetch error:', error);
+      }
+    };
+
+    fetchProjects(newAllocation.clientName);
+  }, [newAllocation.clientName]);
 
   // Function to handle client change and update project options
   const handleClientChange = (e, { value }) => {
+    setNewAllocation(prev => ({
+      ...prev,
+      clientName: value,
+      projectName: '',
+      status: !prev.projectName ? 'Client Unallocated' : prev.status,
+    }));
     setSelectedClient(value);
-    setNewAllocation({ ...newAllocation, clientName: value, projectName: '' });
-
-    // Get project options for the selected client
-    const selectedClientData = clientData.find((client) => client.company === value);
-    const projects = selectedClientData?.projects.map((project) => ({
-      key: project,
-      text: project,
-      value: project,
-    })) || [];
-    setProjectOptions(projects); // Update project options based on selected client
   };
+  
+  const submitAllocation = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/allocate', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          EmployeeID: newAllocation.employeeId,
+          ClientName: newAllocation.clientName,
+          ProjectName: newAllocation.projectName,
+          Allocation: newAllocation.allocation,
+          Role: newAllocation.status,
+          AllocationStartDate: newAllocation.startDate,
+          AllocationEndDate: newAllocation.endDate,
+          TimesheetApproval: newAllocation.timeSheetApprover,
+          BillingRate: newAllocation.billingRate,
+        }),
+      });
 
-  // Function to handle adding or editing an allocation
-  const handleSaveAllocation = () => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      console.log('Allocation saved successfully:', data);
+    } catch (error) {
+      console.error('Error saving allocation:', error);
+    }
+  };
+  const handleSaveAllocation = async () => {
     if (editIndex !== null) {
       // Edit existing allocation
       const updatedAllocations = [...allocations];
@@ -126,26 +213,28 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
       ]);
     }
 
+    // Send data to backend
+    await submitAllocation();
+
     // Clear form fields after saving
     setNewAllocation({
-      employeeName: employee.employee_name,
-      employeeId: employee.employee_id,
+      employeeName: employee.EmployeeName,
+      employeeId: employee.EmployeeID,
       clientName: '',
       projectName: '',
       status: '',
       allocation: '',
       startDate: '',
       endDate: '',
-      billingRate: '', // Clear new field
-      timeSheetApprover: '', // Clear new field
+      billingRate: '',
+      timeSheetApprover: '',
     });
 
     setSelectedClient('');
     setProjectOptions([]);
-    setOpen(false); // Close the modal
-    setEditIndex(null); // Reset edit index
+    setOpen(false);
+    setEditIndex(null);
   };
-
   // Function to handle deletion of an allocation
   const handleDeleteAllocation = (index) => {
     const updatedAllocations = allocations.filter((_, i) => i !== index);
@@ -156,7 +245,7 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
   const handleEditAllocation = (index) => {
     const allocationToEdit = allocations[index];
     setNewAllocation(allocationToEdit); // Set the state with values from the selected allocation
-    setSelectedClient(allocationToEdit.clientName); // Set selected client to populate project dropdown
+    setSelectedClient(allocationToEdit.ClientID); // Set selected client to populate project dropdown
     setEditIndex(index);
 
     // Populate project options based on the selected client
@@ -217,8 +306,8 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
   // Function to open the modal and set the pre-filled values
   const handleOpenModal = () => {
     setNewAllocation({
-      employeeName: employee.employee_name,
-      employeeId: employee.employee_id,
+      employeeName: employee.EmployeeName,
+      employeeId: employee.EmployeeID,
       clientName: '',
       projectName: '',
       status: '',
@@ -237,6 +326,19 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
     navigate(-1); // Navigate back to the previous page
   };
 
+  const handleProjectChange = (e, { value }) => {
+    setNewAllocation(prev => ({
+      ...prev,
+      projectName: value,
+      status: newAllocation.clientName && value && (!newAllocation.allocation || newAllocation.allocation === '0')
+        ? 'Project Unallocated'
+        : newAllocation.clientName && value && newAllocation.allocation && newAllocation.allocation !== '0'
+        ? 'Allocated'
+        : newAllocation.clientName && !newAllocation.projectName
+        ? 'Client Unallocated'
+        : prev.status,
+    }));
+  };
   // Check if all fields are filled in the modal form
   const isFormValid = () => {
     return (
@@ -266,14 +368,14 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
         <Card className="employee-card" centered>
           <Card.Content>
             <Card.Header className="card-header">
-              {employee.employee_name} {/* Dynamic Employee Name */}
+              {employee.EmployeeName} {/* Dynamic Employee Name */}
             </Card.Header>
             <Card.Meta className="card-meta">
               <span>
                 <Icon name="briefcase" /> {employee.role} {/* Dynamic Role */}
               </span>
               <span>
-                <Icon name="mail" /> {employee.email} {/* Dynamic Email */}
+                <Icon name="mail" /> {employee.Email} {/* Dynamic Email */}
               </span>
             </Card.Meta>
             <Card.Description className="card-description">
@@ -302,7 +404,7 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
               </div>
               <div className="grid-item">
                 <span className="content">
-                  <Icon name="hashtag" /> {employee.employee_id} {/* Dynamic Employee ID */}
+                  <Icon name="hashtag" /> {employee.EmployeeID} {/* Dynamic Employee ID */}
                 </span>
               </div>
             </Card.Description>
@@ -366,45 +468,37 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
       {/* Allocations Table */}
       <h3>Allocations</h3>
       <Table celled striped className="allocations-table">
-      <Table.Header>
-  <Table.Row>
-    <Table.HeaderCell>Employee Name</Table.HeaderCell>
-    <Table.HeaderCell>Employee ID</Table.HeaderCell>
-    <Table.HeaderCell>Client Name</Table.HeaderCell>
-    <Table.HeaderCell>Project Name</Table.HeaderCell>
-    <Table.HeaderCell>Allocation %</Table.HeaderCell>
-    <Table.HeaderCell>Status</Table.HeaderCell>
-    <Table.HeaderCell>Start Date</Table.HeaderCell>
-    <Table.HeaderCell>End Date</Table.HeaderCell>
-    <Table.HeaderCell>Billing Rate</Table.HeaderCell> {/* New column */}
-    <Table.HeaderCell>Time Sheet Approver</Table.HeaderCell> {/* New column */}
-    <Table.HeaderCell>Modified By</Table.HeaderCell> {/* New column */}
-    <Table.HeaderCell>Actions</Table.HeaderCell> {/* New column for actions */}
-  </Table.Row>
-</Table.Header>
-
-<Table.Body>
-  {allocations.map((alloc, index) => (
-    <Table.Row key={index}>
-      <Table.Cell>{alloc.employeeName}</Table.Cell>
-      <Table.Cell>{alloc.employeeId}</Table.Cell>
-      <Table.Cell>{alloc.clientName}</Table.Cell>
-      <Table.Cell>{alloc.projectName}</Table.Cell>
-      <Table.Cell>{alloc.allocation}</Table.Cell>
-      <Table.Cell>{alloc.status}</Table.Cell>
-      <Table.Cell>{alloc.startDate}</Table.Cell>
-      <Table.Cell>{alloc.endDate}</Table.Cell>
-      <Table.Cell>{alloc.billingRate} USD</Table.Cell> {/* Billing Rate data */}
-      <Table.Cell>{alloc.timeSheetApprover}</Table.Cell> {/* Time Sheet Approver data */}
-      <Table.Cell>Modified by Kiran on 24th January 2024</Table.Cell> {/* New column */}
-      <Table.Cell>
-        <Button icon="edit" onClick={() => handleEditAllocation(index)} />
-        <Button icon="trash" color="red" onClick={() => handleDeleteAllocation(index)} />
-      </Table.Cell>
-    </Table.Row>
-  ))}
-</Table.Body>
-
+        <Table.Header>
+          <Table.Row>
+            <Table.HeaderCell>Employee Name</Table.HeaderCell>
+            <Table.HeaderCell>Employee ID</Table.HeaderCell>
+            <Table.HeaderCell>Client Name</Table.HeaderCell>
+            <Table.HeaderCell>Project Name</Table.HeaderCell>
+            <Table.HeaderCell>Allocation %</Table.HeaderCell>
+            <Table.HeaderCell>Status</Table.HeaderCell>
+            <Table.HeaderCell>Start Date</Table.HeaderCell>
+            <Table.HeaderCell>End Date</Table.HeaderCell>
+            <Table.HeaderCell>Actions</Table.HeaderCell> {/* New column for actions */}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {allocations.map((alloc, index) => (
+            <Table.Row key={index}>
+              <Table.Cell>{alloc.EmployeeName}</Table.Cell>
+              <Table.Cell>{alloc.EmployeeID}</Table.Cell>
+              <Table.Cell>{alloc.ClientName}</Table.Cell>
+              <Table.Cell>{alloc.ProjectName}</Table.Cell>
+              <Table.Cell>{alloc.Allocation}</Table.Cell>
+              <Table.Cell>{alloc.ProjectStatus}</Table.Cell>
+              <Table.Cell>{alloc.AllocationStartDate}</Table.Cell>
+              <Table.Cell>{alloc.AllocationEndDate}</Table.Cell>
+              <Table.Cell>
+                <Button icon="edit" onClick={() => handleEditAllocation(index)} />
+                <Button icon="trash" color="red" onClick={() => handleDeleteAllocation(index)} />
+              </Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
       </Table>
 
       {/* Add Allocation Button */}
@@ -417,92 +511,52 @@ const EmployeeDetails = ({ userRole }) => {  // Accept userRole as a prop
 
       {/* Modal for Adding or Editing Allocation */}
       <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        size="tiny"
-        dimmer="blurring"
-      >
-        <Modal.Header>{editIndex !== null ? 'Edit Allocation' : 'Add New Allocation'}</Modal.Header>
-        <Modal.Content>
-          <Form>
-            <Form.Input
-              label="Employee Name"
-              placeholder="Enter employee name"
-              value={newAllocation.employeeName}
-              readOnly
-            />
-            <Form.Input
-              label="Employee ID"
-              placeholder="Enter employee ID"
-              value={newAllocation.employeeId}
-              readOnly
-            />
-            <Form.Field>
-              <label>Client Name</label>
+  open={open}
+  onClose={() => setOpen(false)}
+  size="tiny"
+  dimmer="blurring"
+>
+  <Modal.Header>{editIndex !== null ? 'Edit Allocation' : 'Add New Allocation'}</Modal.Header>
+  <Modal.Content>
+    <Form>
+      <Form.Input
+        label="Employee Name"
+        placeholder="Enter employee name"
+        value={newAllocation.employeeName}
+        readOnly
+      />
+      <Form.Input
+        label="Employee ID"
+        placeholder="Enter employee ID"
+        value={newAllocation.employeeId}
+        readOnly
+      />
+      <Form.Field>
+              <label>Client</label>
               <Dropdown
-                placeholder="Select Client"
+                placeholder='Select Client'
                 fluid
                 selection
-                options={[
-                  { key: 'none', text: 'None', value: '' }, // Add "None" option
-                  ...clientOptions,
-                ]}
+                options={clientData.map(client => ({
+                  key: client.ClientName,
+                  text: client.ClientName,
+                  value: client.ClientName,
+                }))}
                 value={newAllocation.clientName}
-                onChange={(e, { value }) => {
-                  setSelectedClient(value);
-                  setNewAllocation({ ...newAllocation, clientName: value, projectName: '' }); // Reset project when client changes
-
-                  // Update project options based on selected client
-                  if (value) {
-                    const selectedClientData = clientData.find((client) => client.company === value);
-                    const projects = selectedClientData?.projects.map((project) => ({
-                      key: project,
-                      text: project,
-                      value: project,
-                    })) || [];
-
-                    setProjectOptions([
-                      { key: 'none', text: 'None', value: '' },  // Include "None" option
-                      ...projects,
-                    ]);
-
-                    // Automatically set status if client is selected but no project
-                    setNewAllocation((prev) => ({
-                      ...prev,
-                      status: !prev.projectName ? 'Client Unallocated' : prev.status,
-                    }));
-                  } else {
-                    setProjectOptions([]); // Clear project options if no client selected
-                    setNewAllocation((prev) => ({ ...prev, status: '' })); // Reset status if no client
-                  }
-                }}
-                required
+                onChange={handleClientChange}
               />
             </Form.Field>
-            {selectedClient && (
-              <Form.Field>
-                <label>Project Name</label>
-                <Dropdown
-                  placeholder="Select Project"
-                  fluid
-                  selection
-                  options={projectOptions}
-                  value={newAllocation.projectName}
-                  onChange={(e, { value }) => {
-                    setNewAllocation((prev) => ({ ...prev, projectName: value }));
-
-                    // Automatically set status if both client and project are selected but allocation is 0 or empty
-                    if (newAllocation.clientName && value && (!newAllocation.allocation || newAllocation.allocation === '0')) {
-                      setNewAllocation((prev) => ({ ...prev, status: 'Project Unallocated' }));
-                    } else if (newAllocation.clientName && value && newAllocation.allocation && newAllocation.allocation !== '0') {
-                      // Automatically set status to Allocated if both client, project are filled, and allocation is greater than 0
-                      setNewAllocation((prev) => ({ ...prev, status: 'Allocated' }));
-                    }
-                  }}
-                  required
-                />
-              </Form.Field>
-            )}
+            <Form.Field>
+              <label>Project</label>
+              <Dropdown
+                placeholder='Select Project'
+                fluid
+                selection
+                options={projectOptions}
+                value={newAllocation.projectName}
+                onChange={handleProjectChange}
+              />
+            </Form.Field>
             <Form.Field>
               <label>Status</label>
               <Dropdown
